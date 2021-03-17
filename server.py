@@ -10,7 +10,6 @@ def send_message(message, address, port):
 
     try:
         ss.sendto(binascii.unhexlify(message), server_addr)
-        print("Hi")
         data, _ = ss.recvfrom(4096)
     except:
         print("ERROR")
@@ -35,13 +34,13 @@ def connect_to_client(port):
     while True:
         data = csockid.recv(1024).decode()
         data = str(data)
-        ip = getIP("facebook.com")
-        # data = data.lower()
-        #print(data)
 
-        csockid.send(ip.encode('utf-8'))
         if not data:
             break
+        
+        ip = getIP(data)
+        print(ip)
+        csockid.send(ip.encode('utf-8'))
         list.append(data)
 
     sock_to_client.close()
@@ -67,16 +66,13 @@ def bin_to_ipv4(in_binary):
     format_bin = [x[::-1] for x in format_bin]
     format_bin.reverse()
     format_bin = [str(int(x,2)) for x in format_bin]
-    #print(format_bin)
+    
     return format_list(format_bin)
 
 def getRequest(name):
     temp = name.split(".")
     print(temp)
-    # host = temp[0]
-    # print(host)
-    # domain = temp[1]
-    # print(domain)
+
     request = ""
 
     for i in range(len(temp)):
@@ -92,30 +88,11 @@ def getRequest(name):
         for j in range(int(host_length)):
             print(host[j])
             request = request  + " " + "".join(hex(ord(host[j]))[2:]) + " "
-        # request = request +  " "
-
-    #
-    # host_length = len(host)
-    # if host_length < 10:
-    #     host_length = "0" + str(host_length)
-    #     #host_length = int(host_length)
-    #
-    # domain_length = len(domain)
-    # if domain_length < 10:
-    #     domain_length = "0" + str(domain_length)
-    #     #domain_length = int(domain_length)
-    #
-    # request = str(host_length)
-    #
-    # for i in range(int(host_length)):
-    #     request = request + " " + "".join(hex(ord(host[i]))[2:])
-    #
-    # request = request +  " " + str(domain_length)
-    #
-    # for i in range(int(domain_length)):
-    #     request = request + " " + "".join(hex(ord(domain[i]))[2:])
 
     return request + " 00 00 01 00 01"
+
+def get_number_of_ip(length):
+    return length/4
 
 def getIP(name):
     header = "AA AA 01 00 00 01 00 00 00 00 00 00"
@@ -125,33 +102,34 @@ def getIP(name):
     message = message.replace(" ","").replace("\n","")
     response = send_message(message, "8.8.8.8", 53)
 
-    print(response)
+    print(format_hex(response))
     num = int(response, 16)
+    data_mask = pow(2,32) - 1
+    length_mask = data_mask << 16
+    r_legnth = length_mask.bit_length()
+    #print(r_legnth)
+    print(getRDLength(num & length_mask))
     print(num)
-    ip = num & (pow(2,32) - 1)
+    ip = num & data_mask
     print(ip)
     print(ip.bit_length())
     bin_ip = bin(ip).replace("0b", "")
     ip = bin_to_ipv4(bin_ip)
     print(ip)
-    return ip;
+    return ip
+
+def format_hex(hex): #Refered from David Pham's rectiation number 7
+    octets = [hex[i:i+2] for i in range(0, len(hex), 2)]
+    pairs = [" ".join(octets[i:i+2]) for i in range(0, len(octets), 2)]
+    return "\n".join(pairs)
+
+def getRDLength(number):
+    in_number = str(bin(number).replace("0b",""))
+    in_number = in_number[::-1]
+    format_bin = [(in_number[i:i+8]) for i in range(0, len(in_number), 8)]
+    format_bin = [x[::-1] for x in format_bin]
+    format_bin.reverse()
+    return int(format_bin[0],2)
 
 
-
-# header = "AA AA 01 00 00 01 00 00 00 00 00 00"
-print(getIP("bbc.co.uk"))
-#connect_to_client(int(sys.argv[1]))
-#print(names_list)
-#
-# request = getRequest("google.com")
-# message = header + " " + request
-# message = message.replace(" ","").replace("\n","")
-# response = send_message(message, "8.8.8.8", 53)
-#
-# print(response)
-# num = int(response, 16)
-# print(num)
-# ip = num & (pow(2,32) - 1)
-# bin_ip = bin(ip).replace("0b", "")
-# ip = bin_to_ipv4(bin_ip)
-# print(ip)
+connect_to_client(int(sys.argv[1]))
