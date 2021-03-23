@@ -11,11 +11,54 @@ def send_message(message, address, port):
     try:
         ss.sendto(binascii.unhexlify(message), server_addr)
         data, _ = ss.recvfrom(4096)
-    except:
-        print("ERROR")
+        temp = data
+        temp = temp.split(b'\xc0')
+        list = []
+
+        for i in range(1,len(temp)):
+            get_ip = parse_IP(binascii.hexlify(temp[i]).decode("utf-8"))
+            list.append(get_ip)
+
+    except Exception as e:
+        print(str(e))
     finally:
         ss.close()
-    return binascii.hexlify(data).decode("utf-8")
+    return binascii.hexlify(data).decode("utf-8"),list
+
+def parse_IP(data):
+
+    if checkType(data) == -1:
+        return "Other"
+    elif checkType(data) == 0:
+        return ""
+    else:
+            num = int(data, 16)
+            data_mask = pow(2,32) - 1
+            length_mask = data_mask << 16
+            r_legnth = length_mask.bit_length()
+            ip = num & data_mask
+            bin_ip = bin(ip).replace("0b", "")
+            ip = bin_to_ipv4(bin_ip)
+            return ip
+
+def checkType(data):
+
+    print(data)
+    if 5 > len(data):
+        return 0
+
+    if data[5] != '1':
+        return -1
+    return 1
+
+def check_Last_Ip(list, ip):
+
+    if list[len(list)-1] is not ip:
+        if list[len(list)-1] is "Other":
+            list.append(ip)
+        else:
+            list[len(list)-1] = ip
+    return list
 
 def connect_to_client(port):
     list = []
@@ -37,11 +80,21 @@ def connect_to_client(port):
 
         if not data:
             break
-        
+
         ip = getIP(data)
-        print(ip)
-        csockid.send(ip.encode('utf-8'))
-        list.append(data)
+        send_data = ""
+        if len(ip) == 1:
+            send_data = ip[0]
+        else:
+            for i in range(len(ip)):
+                if i == 0:
+                    send_data =  ip[i]
+                elif ip[i] == "":
+                    continue
+                else:
+                    send_data = send_data + ", " + ip[i]
+
+        csockid.send(send_data.encode('utf-8'))
 
     sock_to_client.close()
     return
@@ -66,12 +119,11 @@ def bin_to_ipv4(in_binary):
     format_bin = [x[::-1] for x in format_bin]
     format_bin.reverse()
     format_bin = [str(int(x,2)) for x in format_bin]
-    
+
     return format_list(format_bin)
 
 def getRequest(name):
     temp = name.split(".")
-    print(temp)
 
     request = ""
 
@@ -86,7 +138,6 @@ def getRequest(name):
         request = request + part
 
         for j in range(int(host_length)):
-            print(host[j])
             request = request  + " " + "".join(hex(ord(host[j]))[2:]) + " "
 
     return request + " 00 00 01 00 01"
@@ -100,23 +151,16 @@ def getIP(name):
     request = getRequest(name)
     message = header + " " + request
     message = message.replace(" ","").replace("\n","")
-    response = send_message(message, "8.8.8.8", 53)
-
-    print(format_hex(response))
-    num = int(response, 16)
+    data,response = send_message(message, "8.8.8.8", 53)
+    num = int(data, 16)
     data_mask = pow(2,32) - 1
     length_mask = data_mask << 16
     r_legnth = length_mask.bit_length()
-    #print(r_legnth)
-    print(getRDLength(num & length_mask))
-    print(num)
     ip = num & data_mask
-    print(ip)
-    print(ip.bit_length())
     bin_ip = bin(ip).replace("0b", "")
     ip = bin_to_ipv4(bin_ip)
-    print(ip)
-    return ip
+    response = check_Last_Ip(response, ip)
+    return response
 
 def format_hex(hex): #Refered from David Pham's rectiation number 7
     octets = [hex[i:i+2] for i in range(0, len(hex), 2)]
